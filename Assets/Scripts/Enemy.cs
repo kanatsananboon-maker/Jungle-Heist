@@ -54,7 +54,7 @@ public abstract class Enemy : MonoBehaviour
     {
         if (collision.gameObject.CompareTag("Player"))
         {
-            PlayerController player = collision.gameObject.GetComponent<PlayerController>();
+            Player player = collision.gameObject.GetComponent<Player>();
             if (player == null) return;
 
             Vector2 enemyCenter = rb.position;
