@@ -1,32 +1,25 @@
 using UnityEngine;
 
-public class PlayerController : MonoBehaviour
+public class Player : MonoBehaviour
 {
-    // เปลี่ยน moveSpeed เป็นความเร็วเดียวที่ใช้ในการเคลื่อนที่
+    // กำหนดความเร็วในการเคลื่อนที่
     public float moveSpeed = 5f;
-    // ลบ runSpeed ออกไปเพื่อลดความซ้ำซ้อนในตอนนี้
+    // ลบ runSpeed ออกไปเพื่อความเรียบง่ายในการควบคุม (ตอนนี้ใช้ moveSpeed อย่างเดียว)
 
     private Rigidbody2D rb;
     private Animator anim;
 
-    // ลบ isGrounded ออกไปก่อนเพื่อความเรียบง่ายในการแก้ไขปัญหาหลัก
-    // (สามารถเพิ่มกลับมาได้เมื่อต้องการ Jump)
+    // สามารถเพิ่ม isGrounded กลับมาได้ถ้าต้องการทำ Jump
+    private bool isGrounded = false;
 
     void Start()
     {
-        // ตรวจสอบให้แน่ใจว่าตัวละครมี Rigidbody2D และ Animator ติดอยู่
         rb = GetComponent<Rigidbody2D>();
         anim = GetComponent<Animator>();
 
-        // ตรวจสอบค่า Rigidbody เพื่อให้มั่นใจว่า Gravity Scale ไม่เป็น 0
-        if (rb == null)
-        {
-            Debug.LogError("Rigidbody2D component missing from Player!");
-        }
-        if (anim == null)
-        {
-            Debug.LogError("Animator component missing from Player!");
-        }
+        // ** (ข้อควรระวังเกี่ยวกับ Scale) **
+        // ตรวจสอบว่าไม่มีโค้ดบรรทัดใดๆ ที่มีการตั้งค่า transform.localScale = new Vector3(1, 1, 1);
+        // ใน Start() หรือ Awake() เพราะจะทำให้ Scale ที่ตั้งค่าไว้ใน Inspector ถูก Reset
     }
 
     void Update()
@@ -42,28 +35,39 @@ public class PlayerController : MonoBehaviour
         // คำนวณความเร็วเป้าหมายในแกน X
         float targetVelocityX = inputX * moveSpeed;
 
-        // *** การแก้ไขที่สำคัญ: ใช้ rb.velocity เพื่อควบคุมการเคลื่อนที่ 
-        // โดยคงค่าความเร็วในแกน Y ไว้ (สำหรับการกระโดด/แรงโน้มถ่วง) ***
+        // *** การแก้ไขปัญหาการเคลื่อนที่: ใช้ rb.velocity เพื่อให้ถูกต้อง ***
+        // โดยคงค่าความเร็วในแกน Y ไว้ (สำหรับการกระโดด/แรงโน้มถ่วง)
         rb.linearVelocity = new Vector2(targetVelocityX, rb.linearVelocity.y);
 
         // พลิกตัวละครตามทิศทางการเคลื่อนที่
         if (inputX != 0)
-            transform.localScale = new Vector3(Mathf.Sign(inputX), 1, 1);
+            // โค้ดนี้จะเปลี่ยนแค่แกน X เพื่อ Flip ตัวละคร (จาก 1 เป็น -1 หรือกลับกัน) 
+            // โดยคงค่า Scale ในแกน Y และ Z ไว้
+            transform.localScale = new Vector3(Mathf.Sign(inputX) * Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
     }
 
     void UpdateAnimation()
     {
-        // *** การแก้ไขที่สำคัญ: ตรวจสอบว่าความเร็วในแนวนอน (velocity.x) มากกว่าค่า Threshold หรือไม่ ***
-        // ถ้ามากกว่า 0.01f แสดงว่ากำลังวิ่ง/เดิน 
+        // *** การแก้ไขปัญหาอนิเมชั่นค้าง: ตรวจสอบความเร็วในแนวนอน ***
+        // ถ้าความเร็วในแกน X มากกว่า 0.01f แสดงว่ากำลังวิ่ง/เดิน
         bool isRunning = Mathf.Abs(rb.linearVelocity.x) > 0.01f;
 
         // ส่งค่าการวิ่ง/ไม่วิ่งให้กับ Animator Parameter "isRunning"
-        // ถ้า isRunning เป็น true: Idle -> Run
-        // ถ้า isRunning เป็น false: Run -> Idle
+        // ถ้า isRunning = true: Idle -> Run
+        // ถ้า isRunning = false: Run -> Idle
         anim.SetBool("isRunning", isRunning);
+    }
 
-        // เราจะไม่ใช้ "isIdle" Parameter เพราะสามารถใช้ isRunning = false เพื่อเปลี่ยนกลับไป Idle ได้เลย
+    // สามารถเพิ่ม Collision Check กลับมาได้
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("Ground"))
+            isGrounded = true;
+    }
+
+    private void OnCollisionExit2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("Ground"))
+            isGrounded = false;
     }
 }
-
-    // ลบ OnCollisionEnter2D และ OnCollisionExit
