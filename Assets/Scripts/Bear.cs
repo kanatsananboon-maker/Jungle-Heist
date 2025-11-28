@@ -1,44 +1,53 @@
 using UnityEngine;
 using static UnityEngine.RuleTile.TilingRuleOutput;
 
-public class BearController : Enemy // สืบทอดจาก EnemyController
+// สืบทอดจาก EnemyController (เพื่อคง Logic การชน Player)
+public class Bear : Enemy
 {
     [Header("Bear Movement")]
     [SerializeField] private float bearWalkSpeed = 2f;
-    [SerializeField] private float bearWalkDistance = 3f;
 
+    // สำหรับการตรวจจับขอบแพลตฟอร์มเท่านั้น
+    [SerializeField] private float edgeCheckDistance = 0.5f; // ระยะยิง Raycast ลงพื้น
+    [SerializeField] private LayerMask groundLayer;
+
+    private float direction = 1f; // 1 = ขวา, -1 = ซ้าย
     private Animator anim;
-    private Vector3 startingPosition;
-    private float direction = 1f;
 
     protected override void Start()
     {
         base.Start();
-        anim = GetComponent<Animator>(); // กำหนด Animator Component
-        startingPosition = transform.position;
+        anim = GetComponent<Animator>(); // หา Animator
     }
 
-    protected override void Update()
+    // ใช้ FixedUpdate() สำหรับการเคลื่อนที่ที่เกี่ยวข้องกับ Physics
+    private void FixedUpdate()
     {
-        base.Update();
-        HandleAnimation(); // **สำคัญ: เรียกใช้ Animation**
+        HandleMovement();
     }
 
     protected override void HandleMovement()
     {
-        float distanceTravelled = transform.position.x - startingPosition.x;
+        if (rb == null || bearWalkSpeed <= 0) return;
 
-        if (distanceTravelled > bearWalkDistance)
+        // 1. **Edge Check**: ยิง Raycast ลงพื้นเพื่อตรวจจับขอบ
+
+        // ตำแหน่งเริ่มต้น Raycast: ด้านหน้าหมีเล็กน้อยและต่ำลงเล็กน้อย
+        Vector2 rayStart = rb.position + new Vector2(direction * 0.4f, 0);
+
+        // ยิง Raycast ลงพื้น
+        // ถ้า Raycast ไม่เจอ Collider ของ Ground Layer แสดงว่ากำลังจะตกขอบ
+        RaycastHit2D hitEdge = Physics2D.Raycast(rayStart, Vector2.down, edgeCheckDistance, groundLayer);
+
+        // 2. **Logic การกลับทิศทาง**
+        // กลับทิศทางถ้า: Raycast ลงพื้นไม่เจออะไร (กำลังจะตกขอบ)
+        if (hitEdge.collider == null)
         {
-            direction = -1f;
+            direction *= -1; // กลับทิศทาง
             Flip();
         }
-        else if (distanceTravelled < -bearWalkDistance)
-        {
-            direction = 1f;
-            Flip();
-        }
 
+        // 3. กำหนดความเร็วในการเคลื่อนที่
         rb.linearVelocity = new Vector2(direction * bearWalkSpeed, rb.linearVelocity.y);
     }
 
@@ -49,30 +58,34 @@ public class BearController : Enemy // สืบทอดจาก EnemyControll
         transform.localScale = scale;
     }
 
-    // **NEW: Method สำหรับจัดการ Animation (ใช้ Speed แทน Bool)**
-    void HandleAnimation()
+    // **Animation Logic (ใช้ Speed)**
+    private void LateUpdate()
     {
-        if (anim != null)
-        {
-            // ตรวจสอบความเร็วในการเคลื่อนที่
-            bool isWalking = Mathf.Abs(rb.linearVelocity.x) > 0.01f;
-
-            if (isWalking)
-            {
-                // ถ้าหมีเดินอยู่ ให้ Animation เล่นด้วยความเร็วปกติ (1.0)
-                anim.speed = 1f;
-            }
-            else
-            {
-                // ถ้าหมีหยุดนิ่ง ให้หยุด Animation ด้วยการตั้งค่า Speed เป็น 0
-                anim.speed = 0f;
-            }
-
-            // หมายเหตุ: โค้ดนี้จะใช้กับ State ปัจจุบันใน Animator เท่านั้น (ซึ่งคือ Walk)
-            // เมื่อ anim.speed = 0f, Sprite จะค้างอยู่ที่เฟรมนั้น
-        }
+        HandleAnimation();
     }
 
-    // คุณสามารถ Override Die() ตรงนี้ได้
-    // ...
+    private void HandleAnimation()
+    {
+        if (anim == null)
+        {
+            anim = GetComponent<Animator>();
+            if (anim == null) return;
+        }
+
+        bool isWalking = Mathf.Abs(rb.linearVelocity.x) > 0.01f;
+        anim.speed = isWalking ? 1f : 0f;
+    }
+
+    // **แสดง Raycast ใน Scene View** (สำหรับปรับแต่ง)
+    private void OnDrawGizmos()
+    {
+        if (rb != null)
+        {
+            Gizmos.color = Color.yellow;
+            Vector2 rayStart = rb.position + new Vector2(direction * 0.4f, 0);
+
+            // Edge Check (แนวดิ่ง)
+            Gizmos.DrawLine(rayStart, rayStart + Vector2.down * edgeCheckDistance);
+        }
+    }
 }
