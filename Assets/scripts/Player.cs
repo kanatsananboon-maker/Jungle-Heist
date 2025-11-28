@@ -3,6 +3,7 @@ using UnityEngine;
 // 1. Abstract class และ Abstract method 
 public abstract class CharacterControllerBase : MonoBehaviour
 {
+    // Encapsulation
     [SerializeField] protected float moveSpeed = 5f;
     [SerializeField] protected float jumpForce = 10f;
 
@@ -13,21 +14,22 @@ public abstract class CharacterControllerBase : MonoBehaviour
 // 2. Inheritance
 public class Player : CharacterControllerBase
 {
-    // ตัวแปรสำหรับ Inspector
+    // Collider และ Ground Check
     public Transform groundCheckPoint;
     public LayerMask groundLayer;
     [SerializeField] private float groundCheckRadius = 0.2f;
-
-    // Collider หลัก
     public BoxCollider2D standingCollider;
     public BoxCollider2D crouchCollider;
 
-    // **NEW: สำหรับการเกิดใหม่ (Respawn)**
-    [Header("Respawn")] // หัวข้อใน Inspector
-    public Transform respawnPoint; // วัตถุที่ระบุจุดเกิดใหม่ (คุณต้องสร้างใน Scene)
+    [Header("Respawn")]
+    public Transform respawnPoint;
     private Vector3 initialRespawnPosition;
 
-    // สถานะ
+    // **NEW: Encapsulation สำหรับขอบเขตของฉาก**
+    [Header("Boundary")]
+    [SerializeField] private float minXBoundary = -10f; // ขอบเขตซ้ายสุด
+    [SerializeField] private float maxXBoundary = 10f;  // ขอบเขตขวาสุด
+
     private Rigidbody2D rb;
     private Animator anim;
     private bool isGrounded = false;
@@ -38,14 +40,12 @@ public class Player : CharacterControllerBase
         rb = GetComponent<Rigidbody2D>();
         anim = GetComponent<Animator>();
 
-        // **NEW: บันทึกตำแหน่งเริ่มต้นเป็นจุดเกิดใหม่**
         if (respawnPoint != null)
         {
             initialRespawnPosition = respawnPoint.position;
         }
         else
         {
-            // ถ้าไม่ได้กำหนด respawnPoint ให้ใช้ตำแหน่งเริ่มต้นของ Player
             initialRespawnPosition = transform.position;
         }
 
@@ -65,7 +65,6 @@ public class Player : CharacterControllerBase
         HandleAnimation();
     }
 
-    // Polymorphism: Method Overloading
     private void HandleJump()
     {
         if (!isCrouching && isGrounded && Input.GetButtonDown("Jump"))
@@ -90,6 +89,20 @@ public class Player : CharacterControllerBase
 
         if (inputX != 0)
             transform.localScale = new Vector3(Mathf.Sign(inputX) * Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
+
+        // **NEW: ตรวจสอบและจำกัดขอบเขต**
+        ClampBoundary();
+    }
+
+    // **NEW: Method Encapsulation สำหรับการจำกัดขอบเขต**
+    private void ClampBoundary()
+    {
+        Vector3 currentPosition = transform.position;
+
+        // ใช้ Mathf.Clamp เพื่อจำกัดตำแหน่ง X ให้อยู่ระหว่าง minXBoundary และ maxXBoundary
+        currentPosition.x = Mathf.Clamp(currentPosition.x, minXBoundary, maxXBoundary);
+
+        transform.position = currentPosition;
     }
 
     void HandleCrouch()
@@ -116,13 +129,9 @@ public class Player : CharacterControllerBase
         anim.SetBool("isJumping", !isGrounded);
     }
 
-    // **NEW: Method สำหรับการตายและการเกิดใหม่ (ถูกเรียกจาก DeathZone.cs)**
     public void DieAndRespawn()
     {
-        // 1. นำตัวละครกลับไปยังจุดเกิดใหม่
-        rb.linearVelocity = Vector2.zero; // หยุดการเคลื่อนไหว
+        rb.linearVelocity = Vector2.zero;
         transform.position = initialRespawnPosition;
-
-        // *ตรงนี้คือตำแหน่งที่คุณจะใส่ Logic ของการเล่นเสียงตาย, ลดพลังชีวิต, หรือเปลี่ยน Scene*
     }
 }
