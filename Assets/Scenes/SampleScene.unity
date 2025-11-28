@@ -4641,7 +4641,7 @@ Transform:
   m_GameObject: {fileID: 299527843}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -7.25, y: 1.02, z: 0}
+  m_LocalPosition: {x: -7.25, y: 1.07, z: 0}
   m_LocalScale: {x: 3.9296982, y: 3.2467806, z: 1.2186244}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -19120,7 +19120,8 @@ GameObject:
   - component: {fileID: 1678223310}
   - component: {fileID: 1678223309}
   - component: {fileID: 1678223312}
-  m_Layer: 0
+  - component: {fileID: 1678223313}
+  m_Layer: 3
   m_Name: Bear
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -19218,7 +19219,7 @@ Transform:
   m_GameObject: {fileID: 1678223308}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.63, y: 3.08, z: 0}
+  m_LocalPosition: {x: -3.82, y: 3.08, z: 0}
   m_LocalScale: {x: 1.8593, y: 1.8593, z: 1.8593}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -19270,6 +19271,27 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 0.54, y: 0.63}
   m_EdgeRadius: 0
+--- !u!114 &1678223313
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1678223308}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b62193cd76646a40b4f4ad3e72abdea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 5
+  stompForce: 5
+  stompCheckOffset: 0.5
+  bearWalkSpeed: 2
+  checkDistance: 0.05
+  horizontalCheckOffset: 0.45
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 8
 --- !u!1 &1735853610
 GameObject:
   m_ObjectHideFlags: 0

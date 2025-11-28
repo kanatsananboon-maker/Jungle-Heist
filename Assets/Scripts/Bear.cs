@@ -1,25 +1,28 @@
 using UnityEngine;
 using static UnityEngine.RuleTile.TilingRuleOutput;
 
-public class Bear : Enemy
+// สืบทอดจาก EnemyController (เพื่อคง Logic การชน Player และการกำหนด rb)
+public class BearController : Enemy
 {
     [Header("Bear Movement")]
+    // ตัวแปรนี้กำหนดขีดจำกัดการเดินจากจุดเริ่มต้น (Center)
+    [SerializeField] private float bearWalkDistance = 3f;
     [SerializeField] private float bearWalkSpeed = 2f;
 
-    // **MODIFIED: สำหรับการตรวจจับขอบแพลตฟอร์มเท่านั้น**
-    [SerializeField] private float checkDistance = 0.05f; // ระยะยิง Raycast ลงพื้น (สั้นมาก)
-    [SerializeField] private float horizontalCheckOffset = 0.45f; // ระยะยื่น Raycast ออกจากตัวหมี
-    [SerializeField] private LayerMask groundLayer;
-
-    private float direction = 1f;
+    private float direction = 1f; // 1 = ขวา, -1 = ซ้าย
+    private Vector3 startingPosition; // จุดเริ่มต้น/จุดกึ่งกลาง (Center)
     private Animator anim;
 
     protected override void Start()
     {
-        base.Start();
+        base.Start(); // **สำคัญ:** เรียก Start ของ EnemyController เพื่อกำหนด rb
         anim = GetComponent<Animator>();
+
+        // กำหนดตำแหน่งเริ่มต้น (Center Point) เมื่อเกมเริ่ม
+        startingPosition = transform.position;
     }
 
+    // ใช้ FixedUpdate() สำหรับการเคลื่อนที่ที่เกี่ยวข้องกับ Physics
     private void FixedUpdate()
     {
         HandleMovement();
@@ -29,34 +32,38 @@ public class Bear : Enemy
     {
         if (rb == null || bearWalkSpeed <= 0) return;
 
-        // 1. **Edge Check**: ตรวจจับว่าขอบของ Collider ของหมี (ด้านหน้า) มีพื้นอยู่ใต้เท้าหรือไม่
+        // 1. คำนวณระยะทางที่เดินได้จากจุดเริ่มต้น
+        float distanceTravelled = transform.position.x - startingPosition.x;
 
-        // ตำแหน่งเริ่มต้น Raycast: ด้านหน้าหมีเล็กน้อย (ใช้ horizontalCheckOffset) และอยู่ต่ำกว่าจุดศูนย์กลางเล็กน้อย (-0.1f)
-        Vector2 rayStart = rb.position + new Vector2(direction * horizontalCheckOffset, -0.1f);
+        // 2. Logic การกลับทิศทาง (Waypoint Check)
 
-        // ยิง Raycast ลงพื้นด้วยระยะทางที่สั้นมาก (checkDistance)
-        // เพื่อให้แน่ใจว่ามันตรวจสอบ "ใต้เท้า" ที่ขอบพอดี
-        RaycastHit2D hitEdge = Physics2D.Raycast(rayStart, Vector2.down, checkDistance, groundLayer);
-
-        // 2. **Logic การกลับทิศทาง**
-        // กลับทิศทางถ้า: Raycast ลงพื้นไม่เจออะไร (hitEdge.collider == null)
-        if (hitEdge.collider == null)
+        // Point B: ถ้าเดินไปทางขวาถึงขีดจำกัด
+        if (distanceTravelled >= bearWalkDistance)
         {
-            direction *= -1; // กลับทิศทาง
+            direction = -1f; // กลับไปทางซ้าย
+            Flip();
+        }
+        // Point A: ถ้าเดินไปทางซ้ายถึงขีดจำกัด
+        else if (distanceTravelled <= -bearWalkDistance)
+        {
+            direction = 1f; // กลับไปทางขวา
             Flip();
         }
 
         // 3. กำหนดความเร็วในการเคลื่อนที่
+        // **สำคัญ:** rb.velocity.y ถูกปล่อยให้ Rigidbody 2D และ Gravity จัดการ
         rb.linearVelocity = new Vector2(direction * bearWalkSpeed, rb.linearVelocity.y);
     }
 
     void Flip()
     {
+        // กลับด้าน Sprite ด้วยการกลับค่า Scale X
         Vector3 scale = transform.localScale;
         scale.x *= -1;
         transform.localScale = scale;
     }
 
+    // **Animation Logic (ใช้ Speed)**
     private void LateUpdate()
     {
         HandleAnimation();
@@ -70,22 +77,38 @@ public class Bear : Enemy
             if (anim == null) return;
         }
 
+        // Animation จะเล่นเมื่อความเร็วในแนวนอนมากกว่า 0.01 (กำลังเดิน)
         bool isWalking = Mathf.Abs(rb.linearVelocity.x) > 0.01f;
         anim.speed = isWalking ? 1f : 0f;
     }
 
-    // แสดง Raycast ใน Scene View (สำหรับปรับแต่ง)
+    // **แสดงขอบเขตการเดิน (Waypoints) ใน Scene View**
     private void OnDrawGizmos()
     {
-        // ตรวจสอบ rb ไม่ให้เป็น null ก่อน
-        if (Application.isPlaying && rb != null)
+        // Gizmo จะแสดงเมื่อไม่ได้กด Play เท่านั้น
+        if (!Application.isPlaying && startingPosition != Vector3.zero)
         {
-            Gizmos.color = Color.yellow;
-            // ตำแหน่งเริ่มต้น Raycast ที่โค้ดใช้
-            Vector2 rayStart = rb.position + new Vector2(direction * horizontalCheckOffset, -0.1f);
+            // คำนวณจุด A (ซ้าย) และ จุด B (ขวา)
+            Vector3 pointA = startingPosition - new Vector3(bearWalkDistance, 0, 0);
+            Vector3 pointB = startingPosition + new Vector3(bearWalkDistance, 0, 0);
 
-            // Edge Check (แนวดิ่ง)
-            Gizmos.DrawLine(rayStart, rayStart + Vector2.down * checkDistance);
+            // วาดเส้นและจุดสีน้ำเงินเพื่อแสดงขอบเขต
+            Gizmos.color = Color.blue;
+            Gizmos.DrawWireSphere(pointA, 0.1f);
+            Gizmos.DrawWireSphere(pointB, 0.1f);
+            Gizmos.DrawLine(pointA, pointB);
+        }
+        else if (Application.isPlaying)
+        {
+            // ถ้ากำลังเล่นเกม ให้ใช้ตำแหน่งปัจจุบันเพื่อแสดง Waypoint
+            Vector3 currentCenter = transform.position - new Vector3(transform.position.x - startingPosition.x, 0, 0);
+            Vector3 pointA = currentCenter - new Vector3(bearWalkDistance, 0, 0);
+            Vector3 pointB = currentCenter + new Vector3(bearWalkDistance, 0, 0);
+
+            Gizmos.color = Color.blue;
+            Gizmos.DrawWireSphere(pointA, 0.1f);
+            Gizmos.DrawWireSphere(pointB, 0.1f);
+            Gizmos.DrawLine(pointA, pointB);
         }
     }
 }
