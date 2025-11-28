@@ -1,26 +1,37 @@
 using UnityEngine;
 
-public class PlayerController : MonoBehaviour
+// 1. Abstract class และ Abstract method (Polymorphism: Method Overriding)
+public abstract class CharacterControllerBase : MonoBehaviour
 {
-    public float moveSpeed = 5f;
-    public float jumpForce = 10f;
-    public float climbSpeed = 3f;
+    // Encapsulation: ตัวแปรทั้งหมดใช้ Encapsulation
+    [SerializeField] protected float moveSpeed = 5f;
+    [SerializeField] protected float jumpForce = 10f;
 
-    // สำหรับ Ground Check
+    protected abstract void HandleMovement();
+    protected abstract void HandleAnimation();
+}
+
+// 2. Inheritance
+public class Player : CharacterControllerBase
+{
+    // ตัวแปรสำหรับ Inspector
     public Transform groundCheckPoint;
     public LayerMask groundLayer;
-    public LayerMask climbLayer; // 👈 ยังจำเป็นต้องใช้ LayerMask นี้
-    public float groundCheckRadius = 0.2f;
 
-    // สำหรับ Crouch
+    // **NEW: ทำให้ groundCheckRadius เป็น [SerializeField] เพื่อให้ตั้งค่าใน Inspector ได้**
+    [SerializeField] private float groundCheckRadius = 0.2f;
+
+    // Collider หลัก
     public BoxCollider2D standingCollider;
     public BoxCollider2D crouchCollider;
 
+    // สถานะ
     private Rigidbody2D rb;
     private Animator anim;
     private bool isGrounded = false;
     private bool isCrouching = false;
-    private bool isClimbing = false;
+
+    // ลบ isClimbing และ isInClimbZone ออกทั้งหมด
 
     void Start()
     {
@@ -36,95 +47,35 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        // 1. ตรวจสอบพื้น
         isGrounded = Physics2D.OverlapCircle(groundCheckPoint.position, groundCheckRadius, groundLayer);
 
+        // 2. จัดการท่าหมอบ
         HandleCrouch();
-        HandleClimb(); // 👈 จัดการการปีนป่ายที่นี่
 
-        // 3. การกระโดด (Jump Logic)
-        if (!isClimbing && !isCrouching && isGrounded && Input.GetButtonDown("Jump"))
+        // 3. จัดการการเคลื่อนที่และการกระโดด (ใช้ Abstract Method)
+        HandleMovement();
+
+        // 4. จัดการอนิเมชั่น (ใช้ Abstract Method)
+        HandleAnimation();
+    }
+
+    // 4. Polymorphism: Method Overloading (ใช้ชื่อเดียวกันแต่มี Parameter ต่างกัน)
+    private void HandleJump()
+    {
+        // ห้ามกระโดดขณะหมอบ
+        if (!isCrouching && isGrounded && Input.GetButtonDown("Jump"))
         {
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
         }
-
-        Move();
-        UpdateAnimation();
     }
 
-    // ----------------------------------------------------
-    // NEW: ใช้ OnTriggerStay2D ตรวจสอบว่าชนกับวัตถุปีนได้
-    private void OnTriggerStay2D(Collider2D collision)
+    // 3. (ต่อ) จัดการการเคลื่อนที่ทั้งหมด
+    protected override void HandleMovement()
     {
-        // ตรวจสอบว่า Collider ที่ชนมี Layer ตรงกับ Climb LayerMask หรือไม่
-        if (((1 << collision.gameObject.layer) & climbLayer) != 0)
-        {
-            // ถ้าชนกับวัตถุปีนได้และกดปุ่มขึ้น/ลง
-            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.DownArrow))
-            {
-                isClimbing = true;
-            }
-        }
-    }
+        HandleJump();
 
-    private void OnTriggerExit2D(Collider2D collision)
-    {
-        // เมื่อออกจากวัตถุปีนได้ ให้หยุดปีนและคืน Gravity
-        if (((1 << collision.gameObject.layer) & climbLayer) != 0)
-        {
-            if (isClimbing)
-            {
-                isClimbing = false;
-                rb.gravityScale = 3f; // คืน Gravity
-            }
-        }
-    }
-    // ----------------------------------------------------
-
-    void HandleClimb()
-    {
-        // ถ้ากำลังปีนอยู่
-        if (isClimbing)
-        {
-            // ปิด Gravity ชั่วคราว
-            rb.gravityScale = 0f;
-
-            // รับค่า Input ในแนวดิ่ง
-            float inputY = Input.GetAxisRaw("Vertical");
-
-            // กำหนดความเร็วในการปีน (ห้ามให้ความเร็ว X เป็น 0 เพราะจะทำให้หยุดการปีนเมื่อปล่อย W/S)
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, inputY * climbSpeed);
-
-            // ถ้ากระโดดขณะปีนอยู่
-            if (Input.GetButtonDown("Jump"))
-            {
-                isClimbing = false;
-                rb.gravityScale = 3f; // คืน Gravity
-                rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce); // กระโดดออก
-            }
-
-            // ถ้าไม่ได้กดปุ่ม W/S/Up/Down ให้หยุดการเคลื่อนไหวในแนวตั้ง
-            if (Mathf.Abs(inputY) < 0.01f)
-            {
-                rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0f);
-            }
-        }
-        else if (rb.gravityScale == 0 && !isClimbing)
-        {
-            rb.gravityScale = 3f; // ป้องกัน Gravity ค้าง
-        }
-    }
-
-    void Move()
-    {
-        // ห้ามเคลื่อนที่แนวนอนถ้ากำลังปีนอยู่
-        if (isClimbing)
-        {
-            // ถ้าปีนอยู่ ให้หยุดการควบคุม X และกลับไปสู่ HandleClimb
-            rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
-            return;
-        }
-
-        // ห้ามเคลื่อนที่แนวนอนถ้ากำลังหมอบ
+        // ล็อกการเคลื่อนที่แนวนอนถ้ากำลังหมอบ
         if (isCrouching)
         {
             rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
@@ -140,11 +91,9 @@ public class PlayerController : MonoBehaviour
             transform.localScale = new Vector3(Mathf.Sign(inputX) * Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
     }
 
-    // ... (ส่วน HandleCrouch และ UpdateAnimation เดิม)
     void HandleCrouch()
     {
-        if (isClimbing) { isCrouching = false; return; }
-
+        //isClimbing ถูกลบออกไปแล้ว
         isCrouching = Input.GetKey(KeyCode.LeftControl);
 
         if (standingCollider != null && crouchCollider != null)
@@ -154,26 +103,24 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    void UpdateAnimation()
+    // 4. Polymorphism: Method Overriding (ต่อ)
+    protected override void HandleAnimation()
     {
-        anim.SetBool("isClimbing", isClimbing);
+        // ลบ isClimbing ออกจาก Animator
+        // anim.SetBool("isClimbing", isClimbing); 
+
         anim.SetBool("isCrouching", isCrouching);
 
-        if (isClimbing)
-        {
-            anim.speed = Mathf.Abs(rb.linearVelocity.y) > 0.1f ? 1f : 0f;
-            return;
-        }
-        else
-        {
-            anim.speed = 1f;
-        }
+        // ไม่ต้องมี Logic จัดการ isClimbing
+        anim.speed = 1f;
 
         if (isCrouching) return;
 
+        // อนิเมชั่นวิ่ง/Idle
         bool isRunning = Mathf.Abs(rb.linearVelocity.x) > 0.01f;
         anim.SetBool("isRunning", isRunning);
 
+        // อนิเมชั่นกระโดด/ตก
         anim.SetBool("isJumping", !isGrounded);
     }
 }
