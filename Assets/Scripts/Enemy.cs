@@ -1,43 +1,111 @@
 using UnityEngine;
 
+// กำหนดให้เป็น Abstract เพื่อป้องกันการนำไปใส่ GameObject โดยตรง
 public abstract class Enemy : MonoBehaviour
 {
-    // ตัวแปรพื้นฐานที่ศัตรูทุกตัวต้องมี
-    [Header("Enemy Base Stats")]
-    [SerializeField] protected int maxHealth = 1;
-    protected int currentHealth;
+    [Header("Patrol Settings")]
+    [SerializeField] protected float patrolSpeed = 2f;
+    [SerializeField] protected float waitTime = 1f;
 
-    [Header("Stomp Interaction")]
-    [SerializeField] protected float stompForce = 5f;
-    [SerializeField] protected float stompCheckOffset = 0.5f;
+    // จุดเริ่มต้นและจุดสิ้นสุดของการลาดตระเวน (ลาก Transform จาก Scene มาใส่)
+    public Transform pointA;
+    public Transform pointB;
 
-    // **Protected Rigidbody 2D**
     protected Rigidbody2D rb;
+    protected Animator anim;
+    protected Transform currentTarget;
+    protected float timer;
+    protected bool isWalking = true;
 
-    // Abstract Method: การเคลื่อนที่ (บังคับให้ Subclass ต้อง Implement)
-    protected abstract void HandleMovement();
+    // Abstract Method ที่ต้องถูก implement ในคลาสลูก
+    protected abstract void SetAnimation(bool walking);
 
-    // Virtual Method: Start
     protected virtual void Start()
     {
-        // **สำคัญ: บังคับให้หา Rigidbody 2D ตรงนี้**
         rb = GetComponent<Rigidbody2D>();
-        if (rb == null)
+        anim = GetComponent<Animator>();
+
+        if (pointA == null || pointB == null)
         {
-            Debug.LogError("Enemy is missing Rigidbody2D component! Movement will fail.");
+            Debug.LogError("Enemy points A and B are not assigned. Please assign them in the Inspector.");
+            enabled = false;
+            return;
         }
 
-        currentHealth = maxHealth;
+        currentTarget = pointB;
+        timer = waitTime;
+
+        if (rb != null)
+        {
+            rb.constraints = RigidbodyConstraints2D.FreezeRotation;
+        }
     }
 
     protected virtual void Update()
     {
-        // เราจะไม่เรียก HandleMovement() ใน Update/FixedUpdate ของ Base Class
-        // ให้ Subclass (BearController) เป็นผู้เรียกเองเพื่อความยืดหยุ่น
+        SetAnimation(isWalking); // เรียกใช้ Animation จากคลาสลูก
+
+        if (isWalking)
+        {
+            PatrolMove();
+        }
+        else
+        {
+            HandleWaitTime();
+        }
     }
 
-    // ... (TakeDamage, Die และ OnCollisionEnter2D เหมือนเดิม)
-    // ... (ส่วนที่เหลือของโค้ด EnemyController.cs)
+    protected void PatrolMove()
+    {
+        Vector2 targetPosition = currentTarget.position;
+        Vector2 moveDirection = (targetPosition - (Vector2)transform.position).normalized;
 
-    // หมายเหตุ: โค้ดส่วน OnCollisionEnter2D ต้องใช้ rb เพื่อหาตำแหน่ง
+        if (rb != null)
+        {
+            rb.linearVelocity = new Vector2(moveDirection.x * patrolSpeed, rb.linearVelocity.y);
+        }
+
+        // 3. พลิกตัวตามทิศทางการเดิน
+        if (moveDirection.x > 0.01f) // เดินขวา
+        {
+            Flip(1);
+        }
+        else if (moveDirection.x < -0.01f) // เดินซ้าย
+        {
+            Flip(-1);
+        }
+
+        // 4. ตรวจสอบว่าถึงจุดหมายแล้วหรือไม่
+        if (Vector2.Distance(transform.position, targetPosition) < 0.2f)
+        {
+            if (rb != null) rb.linearVelocity = Vector2.zero;
+            isWalking = false;
+        }
+    }
+
+    protected void HandleWaitTime()
+    {
+        timer -= Time.deltaTime;
+
+        if (timer <= 0)
+        {
+            // สลับเป้าหมาย
+            currentTarget = (currentTarget == pointA) ? pointB : pointA;
+
+            // เริ่มเดินอีกครั้ง
+            isWalking = true;
+            timer = waitTime;
+        }
+    }
+
+    protected void Flip(int direction)
+    {
+        Vector3 scale = transform.localScale;
+
+        if ((direction > 0 && scale.x < 0) || (direction < 0 && scale.x > 0))
+        {
+            scale.x *= -1;
+            transform.localScale = scale;
+        }
+    }
 }
