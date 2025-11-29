@@ -12,7 +12,7 @@ public abstract class CharacterControllerBase : MonoBehaviour
 }
 
 // 2. Inheritance
-public class Player : CharacterControllerBase
+public class PlayerController : CharacterControllerBase
 {
     // Collider และ Ground Check
     public Transform groundCheckPoint;
@@ -25,11 +25,6 @@ public class Player : CharacterControllerBase
     public Transform respawnPoint;
     private Vector3 initialRespawnPosition;
 
-    // **NEW: Encapsulation สำหรับขอบเขตของฉาก**
-    [Header("Boundary")]
-    [SerializeField] private float minXBoundary = -10f; // ขอบเขตซ้ายสุด
-    [SerializeField] private float maxXBoundary = 10f;  // ขอบเขตขวาสุด
-
     private Rigidbody2D rb;
     private Animator anim;
     private bool isGrounded = false;
@@ -40,6 +35,7 @@ public class Player : CharacterControllerBase
         rb = GetComponent<Rigidbody2D>();
         anim = GetComponent<Animator>();
 
+        // บันทึกตำแหน่ง Respawn
         if (respawnPoint != null)
         {
             initialRespawnPosition = respawnPoint.position;
@@ -89,20 +85,6 @@ public class Player : CharacterControllerBase
 
         if (inputX != 0)
             transform.localScale = new Vector3(Mathf.Sign(inputX) * Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
-
-        // **NEW: ตรวจสอบและจำกัดขอบเขต**
-        ClampBoundary();
-    }
-
-    // **NEW: Method Encapsulation สำหรับการจำกัดขอบเขต**
-    private void ClampBoundary()
-    {
-        Vector3 currentPosition = transform.position;
-
-        // ใช้ Mathf.Clamp เพื่อจำกัดตำแหน่ง X ให้อยู่ระหว่าง minXBoundary และ maxXBoundary
-        currentPosition.x = Mathf.Clamp(currentPosition.x, minXBoundary, maxXBoundary);
-
-        transform.position = currentPosition;
     }
 
     void HandleCrouch()
@@ -129,6 +111,7 @@ public class Player : CharacterControllerBase
         anim.SetBool("isJumping", !isGrounded);
     }
 
+    // Method สำหรับการตายและการเกิดใหม่
     public void DieAndRespawn()
     {
         rb.linearVelocity = Vector2.zero;
