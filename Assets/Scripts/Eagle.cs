@@ -1,16 +1,20 @@
 using UnityEngine;
 
-// สืบทอดจาก Enemy เพื่อใช้ Animator และฟังก์ชัน TakeDamage
+// EagleController สืบทอดจาก Enemy
 public class Eagle : Enemy
 {
+    // *** ตั้งค่าใน Inspector ***
     [Header("Eagle Configuration")]
     public float attackRange = 8f;        // ระยะตรวจจับผู้เล่น
     public float diveSpeed = 5f;          // ความเร็วในการพุ่ง
     public float patrolSpeed = 1.5f;      // ความเร็วในการบินวน/กลับ
     public Transform player;              // กำหนด Player ใน Inspector หรือหาจาก Tag
 
+    [Header("Damage Settings")]
+    public int attackDamage = 1;          // ดาเมจที่เหยี่ยวทำต่อการชน 1 ครั้ง
+
+    // *** ตัวแปรภายใน ***
     private Vector3 initialPatrolPoint;   // จุดเริ่มต้น/จุดบินวน
-    private bool isAttacking = false;     // สถานะการโจมตี
 
     // สถานะที่เราจะใช้ในการควบคุม
     private enum EagleState { Patrol, Dive, Return }
@@ -29,6 +33,8 @@ public class Eagle : Enemy
                 player = playerObject.transform;
             }
         }
+
+        // กำหนดจุดเริ่มต้นการบินวน
         initialPatrolPoint = transform.position;
     }
 
@@ -36,7 +42,8 @@ public class Eagle : Enemy
     {
         if (player == null) return;
 
-        float distanceToPlayer = Vector2.Distance(transform.position, player.position);
+        // ใช้ Vector3.Distance เพื่อรองรับการทำงานทั้ง 2D และ 3D
+        float distanceToPlayer = Vector3.Distance(transform.position, player.position);
 
         switch (currentState)
         {
@@ -59,7 +66,7 @@ public class Eagle : Enemy
     private void HandlePatrolState(float distanceToPlayer)
     {
         // 1. บินวน/ลอยตัว (Patrol Animation - IsAttacking = false)
-        anim.SetBool("IsAttacking", false);
+        if (anim != null) anim.SetBool("IsAttacking", false);
 
         // เคลื่อนที่ขึ้นลงเบาๆ ที่จุดเริ่มต้น
         float newY = initialPatrolPoint.y + Mathf.Sin(Time.time * 2f) * 0.5f;
@@ -74,7 +81,7 @@ public class Eagle : Enemy
         {
             // เปลี่ยนสถานะเป็น Dive เพื่อโจมตี
             currentState = EagleState.Dive;
-            anim.SetBool("IsAttacking", true); // เริ่มอนิเมชั่นพุ่ง
+            if (anim != null) anim.SetBool("IsAttacking", true); // เริ่มอนิเมชั่นพุ่ง
         }
     }
 
@@ -86,8 +93,8 @@ public class Eagle : Enemy
         );
 
         // 2. เงื่อนไขการหยุดพุ่ง
-        bool isCloseToTarget = Vector2.Distance(transform.position, player.position) < 0.5f;
-        bool playerOutOfRange = distanceToPlayer > attackRange * 1.5f; // ให้ระยะไกลกว่าปกติเล็กน้อย
+        bool isCloseToTarget = Vector3.Distance(transform.position, player.position) < 0.5f;
+        bool playerOutOfRange = distanceToPlayer > attackRange * 1.5f;
 
         if (isCloseToTarget || playerOutOfRange)
         {
@@ -104,10 +111,31 @@ public class Eagle : Enemy
         );
 
         // 2. เมื่อถึงจุดเริ่มต้นแล้ว
-        if (Vector2.Distance(transform.position, initialPatrolPoint) < 0.1f)
+        if (Vector3.Distance(transform.position, initialPatrolPoint) < 0.1f)
         {
             // กลับสู่สถานะ Patrol
             currentState = EagleState.Patrol;
+        }
+    }
+
+    // **NEW: ตรวจจับการชนเพื่อทำดาเมจ**
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        // 1. ตรวจสอบว่าเหยี่ยวกำลังอยู่ในสถานะโจมตี (Dive) หรือไม่
+        if (currentState == EagleState.Dive)
+        {
+            // 2. ลองดึง Component PlayerController จากวัตถุที่ชน
+            PlayerController playerController = other.GetComponent<PlayerController>();
+
+            // 3. ถ้าเจอ PlayerController แสดงว่าชนผู้เล่น
+            if (playerController != null)
+            {
+                // ทำดาเมจผู้เล่น
+                playerController.TakeDamage(attackDamage);
+
+                // หลังชนแล้ว ให้เหยี่ยวบินกลับทันที
+                currentState = EagleState.Return;
+            }
         }
     }
 }

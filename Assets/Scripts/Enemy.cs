@@ -18,7 +18,6 @@ public class Enemy : MonoBehaviour
     }
 
     // ฟังก์ชันสำหรับสั่งให้ศัตรูเล่นอนิเมชั่นบาดเจ็บ
-    // กำหนดเป็น public virtual เพื่อให้คลาสอื่นเรียกใช้ได้ และคลาสลูกเขียนทับได้
     public virtual void TakeDamage()
     {
         if (anim != null)
@@ -33,7 +32,6 @@ public class Enemy : MonoBehaviour
     public virtual void Die()
     {
         Debug.Log(gameObject.name + " died!");
-        // โค้ดสำหรับจัดการการตาย เช่น เล่นอนิเมชั่นตาย, ดรอปไอเทม, ทำลาย GameObject
-        // Destroy(gameObject); 
+        // โค้ดสำหรับจัดการการตาย
     }
 }
