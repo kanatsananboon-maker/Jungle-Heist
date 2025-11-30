@@ -1,117 +1,113 @@
 using UnityEngine;
 
-public class Eagle : Enemy // สืบทอดจาก Enemy
+// สืบทอดจาก Enemy เพื่อใช้ Animator และฟังก์ชัน TakeDamage
+public class Eagle : Enemy
 {
-    // *** ตั้งค่าใน Inspector ***
-    [Header("Attack Settings")]
-    public float patrolHeight = 4f;     // ความสูงที่เหยี่ยวจะบินวนอยู่เฉยๆ
-    public float attackRange = 8f;      // ระยะห่างที่ผู้เล่นเข้าใกล้แล้วเหยี่ยวจะโจมตี
-    public float diveSpeed = 5f;        // ความเร็วในการพุ่งโจมตี
-    public float returnSpeed = 3f;      // ความเร็วในการบินกลับ
+    [Header("Eagle Configuration")]
+    public float attackRange = 8f;        // ระยะตรวจจับผู้เล่น
+    public float diveSpeed = 5f;          // ความเร็วในการพุ่ง
+    public float patrolSpeed = 1.5f;      // ความเร็วในการบินวน/กลับ
+    public Transform player;              // กำหนด Player ใน Inspector หรือหาจาก Tag
 
-    // *** ตัวแปรภายใน ***
-    private Transform player;           // Reference ถึงตำแหน่งผู้เล่น
-    private Vector3 initialPosition;    // ตำแหน่งเริ่มต้นของเหยี่ยว
-    private bool isDiving = false;      // สถานะการพุ่งโจมตี
+    private Vector3 initialPatrolPoint;   // จุดเริ่มต้น/จุดบินวน
+    private bool isAttacking = false;     // สถานะการโจมตี
 
-    // Override Start() ของคลาสแม่
+    // สถานะที่เราจะใช้ในการควบคุม
+    private enum EagleState { Patrol, Dive, Return }
+    private EagleState currentState = EagleState.Patrol;
+
     protected override void Start()
     {
-        base.Start(); // เรียก Start() ของคลาสแม่ (เพื่อตั้งค่า anim)
+        base.Start(); // เรียก Start() ของ Enemy เพื่อตั้งค่า anim
 
-        // 1. หาวัตถุผู้เล่น (สมมติว่า Player มี Tag เป็น "Player")
-        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
-        if (playerObject != null)
+        // ถ้าไม่ได้กำหนด player ใน Inspector ให้ลองค้นหาจาก Tag "Player"
+        if (player == null)
         {
-            player = playerObject.transform;
+            GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+            if (playerObject != null)
+            {
+                player = playerObject.transform;
+            }
         }
-
-        // 2. กำหนดตำแหน่งเริ่มต้น (ใช้เป็นตำแหน่งสำหรับบินวน)
-        initialPosition = transform.position;
-        // ปรับความสูงเริ่มต้นให้เป็นความสูงที่เราต้องการให้มันบินวน
-        initialPosition.y = patrolHeight;
+        initialPatrolPoint = transform.position;
     }
 
     void Update()
     {
         if (player == null) return;
 
-        // คำนวณระยะห่างระหว่างเหยี่ยวกับผู้เล่น (ใช้ Vector2.Distance สำหรับเกม 2D)
         float distanceToPlayer = Vector2.Distance(transform.position, player.position);
 
-        // --- 1. ตรวจสอบเงื่อนไขการโจมตี ---
-        if (distanceToPlayer < attackRange && !isDiving)
+        switch (currentState)
         {
-            // ผู้เล่นเข้าสู่ระยะโจมตี: เริ่มพุ่งโจมตี
-            StartAttack();
-        }
-        else if (isDiving)
-        {
-            // --- 2. สถานะการพุ่งโจมตี ---
-            DiveAttack();
-        }
-        else
-        {
-            // --- 3. สถานะบินวนอยู่เฉยๆ (Idle Fly) ---
-            Patrol();
+            case EagleState.Patrol:
+                HandlePatrolState(distanceToPlayer);
+                break;
+
+            case EagleState.Dive:
+                HandleDiveState(distanceToPlayer);
+                break;
+
+            case EagleState.Return:
+                HandleReturnState();
+                break;
         }
     }
 
-    // --- LOGIC การบินและการโจมตี ---
+    // --- State Handlers ---
 
-    private void Patrol()
+    private void HandlePatrolState(float distanceToPlayer)
     {
-        // บินวนอยู่แถวตำแหน่งเริ่มต้นและความสูงที่กำหนด
-        // ใช้ Mathf.Sin เพื่อทำให้มันเคลื่อนที่ขึ้นลงเล็กน้อยให้ดูเหมือนกำลังบิน
-        float newY = initialPosition.y + Mathf.Sin(Time.time * 2f) * 0.5f;
-        Vector3 targetPosition = new Vector3(initialPosition.x, newY, initialPosition.z);
+        // 1. บินวน/ลอยตัว (Patrol Animation - IsAttacking = false)
+        anim.SetBool("IsAttacking", false);
+
+        // เคลื่อนที่ขึ้นลงเบาๆ ที่จุดเริ่มต้น
+        float newY = initialPatrolPoint.y + Mathf.Sin(Time.time * 2f) * 0.5f;
+        Vector3 targetPosition = new Vector3(initialPatrolPoint.x, newY, initialPatrolPoint.z);
 
         transform.position = Vector3.MoveTowards(
-            transform.position, targetPosition, Time.deltaTime * 1f
+            transform.position, targetPosition, Time.deltaTime * patrolSpeed
         );
 
-        EndAttack(); // ตรวจสอบให้แน่ใจว่าอนิเมชั่น "IsAttacking" เป็น False
-    }
-
-    public void StartAttack()
-    {
-        isDiving = true;
-
-        // สั่ง Animator เล่นอนิเมชั่นพุ่งโจมตี (Dive Attack)
-        if (anim != null)
+        // 2. ตรวจจับผู้เล่น
+        if (distanceToPlayer < attackRange)
         {
-            anim.SetBool("IsAttacking", true);
+            // เปลี่ยนสถานะเป็น Dive เพื่อโจมตี
+            currentState = EagleState.Dive;
+            anim.SetBool("IsAttacking", true); // เริ่มอนิเมชั่นพุ่ง
         }
     }
 
-    private void DiveAttack()
+    private void HandleDiveState(float distanceToPlayer)
     {
-        // เคลื่อนที่พุ่งไปยังตำแหน่งของผู้เล่น
+        // 1. พุ่งเข้าหาผู้เล่น
         transform.position = Vector3.MoveTowards(
             transform.position, player.position, Time.deltaTime * diveSpeed
         );
 
-        // ถ้าเหยี่ยวไปถึงตำแหน่งผู้เล่น (หรือใกล้มากๆ) ให้มันบินกลับ
-        if (Vector2.Distance(transform.position, player.position) < 0.5f)
+        // 2. เงื่อนไขการหยุดพุ่ง
+        bool isCloseToTarget = Vector2.Distance(transform.position, player.position) < 0.5f;
+        bool playerOutOfRange = distanceToPlayer > attackRange * 1.5f; // ให้ระยะไกลกว่าปกติเล็กน้อย
+
+        if (isCloseToTarget || playerOutOfRange)
         {
-            StopDiveAndReturn();
+            // เปลี่ยนสถานะเป็น Return เพื่อบินกลับ
+            currentState = EagleState.Return;
         }
     }
 
-    // ฟังก์ชันสำหรับสั่งให้เหยี่ยวหยุดโจมตีและเริ่มบินกลับ
-    private void StopDiveAndReturn()
+    private void HandleReturnState()
     {
-        isDiving = false;
-        // เมื่อหยุดโจมตี ตัวเหยี่ยวจะกลับไปสู่ logic ในฟังก์ชัน Update() ที่จะเรียก Patrol()
-    }
+        // 1. บินกลับไปที่จุดเริ่มต้น (initialPatrolPoint)
+        transform.position = Vector3.MoveTowards(
+            transform.position, initialPatrolPoint, Time.deltaTime * patrolSpeed
+        );
 
-
-    // ฟังก์ชันนี้ถูกใช้ใน Patrol()
-    public void EndAttack()
-    {
-        if (anim != null)
+        // 2. เมื่อถึงจุดเริ่มต้นแล้ว
+        if (Vector2.Distance(transform.position, initialPatrolPoint) < 0.1f)
         {
-            anim.SetBool("IsAttacking", false);
+            // กลับสู่สถานะ Patrol
+            currentState = EagleState.Patrol;
         }
     }
 }
