@@ -13884,7 +13884,7 @@ MonoBehaviour:
   diveSpeed: 5
   patrolSpeed: 1.5
   player: {fileID: 1570610049}
-  attackDamage: 1
+  attackDamage: 2
 --- !u!95 &746779504
 Animator:
   serializedVersion: 7
@@ -28626,7 +28626,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   moveSpeed: 5
   jumpForce: 6
-  maxHealth: 3
+  maxHealth: 1
   groundCheckPoint: {fileID: 1174748069}
   groundLayer:
     serializedVersion: 2
